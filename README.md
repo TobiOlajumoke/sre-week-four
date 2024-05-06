@@ -39,3 +39,105 @@ This creates a namespace in your Kubernetes cluster named sre. It is within this
 helm install upcommerce ./upcommerce -n sre
 ```
 
+2. In the templates/ directory, create canary-deployment.yml and canary-service.yml manifest files and fill in the required Helm templates for them.  If you need some ideas, you can find Helm templates for the aforementioned manifests below:
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-canary-app
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-canary-app
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-canary-app
+    spec:
+      containers:
+        - name: canary
+          image: {{ .Values.canary.image }}
+          ports:
+            - containerPort: 5003
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          resources:
+            limits:
+              cpu: {{ .Values.cpuLimit }}
+              memory: {{ .Values.memoryLimit }}
+
+
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-canary-service
+spec:
+  selector:
+    app: {{ .Release.Name }}-canary-app
+  ports:
+    - protocol: TCP
+      port: 5003
+      targetPort: 5003
+```
+
+3. Update the values.yml file with the necessary values that will be cross-referenced in the canary templates (i.e. the image for the canary deployment) using the detail below:
+```
+canary:
+  image: uonyeka/canary:linux-amd64
+```
+If you need a hint on what your values.yml file should look like after the update, click on the expandable section below:   +
+
+```
+replicaCount: 1
+imagePullPolicy: Always
+cpuLimit: "0.5"
+memoryLimit: "2Gi"
+upcommerce:
+  image: uonyeka/upcommerce:v3
+canary:
+  image: uonyeka/canary:linux-amd64
+  ```\
+
+4. Run the command below to upgrade your Helm installation with the latest changes:
+
+```
+helm upgrade upcommerce ./upcommerce -n sre
+```
+
+5. Run the command below to show you details of all deployments in the sre namespace:
+```
+kubectl get deployment -n sre -o wide
+```
+
+6. Because the canary deployment is unstable, you have to roll back the Kubernetes deployment to the last stable state. You can run the command below to get the list of all Helm releases in your cluster and their release numbers
+```
+helm list -a -n sre 
+```
+or run the command below to get a historical overview of the Upcommerce release
+```
+helm history upcommerce -n sre
+```
+
+When you have gotten the release numbers, rollback to the stable release using the command below (replace <release_number> with the actual number of the release you want to roll back to):
+```
+helm rollback upcommerce <release_number> -n sre
+```
+To confirm that things have been rolled back, please run any one of the commands below:
+```
+helm list -a -n sre
+helm history upcommerce -n sre
+```
+
+7.  Here are some other commands that you can use to better understand and explore your Helm deployment:
+```
+helm ls -n sre    # List all releases (deployments).
+helm status upcommerce -n sre   # Get detailed information about a specific release.
+helm uninstall upcommerce -n sre  # Uninstall a release.
+helm history upcommerce -n sre  # View the revision history of a release.
+helm show values ./upcommerce -n sre  # Display default values from the chart.
+helm show readme ./upcommerce -n sre  # Show the chart’s README.
+helm lint ./upcommerce -n sre  # Check your chart for issues.
+helm template upcommerce ./upcommerce -n sre  # Render templates without installing.
+```
